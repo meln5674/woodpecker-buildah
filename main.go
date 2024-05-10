@@ -112,32 +112,32 @@ func execute(opts *options) error {
 		case "login":
 			err := login(opts)
 			if err != nil {
-				return err	
+				return err
 
 			}
 		case "manifest":
 			err := createManifest(opts)
 			if err != nil {
-				return err	
+				return err
 
-			}	
+			}
 		case "build":
 			err := buildArchs(opts)
 			if err != nil {
-				return err	
+				return err
 
 			}
 		case "push":
 			err := push(opts)
 			if err != nil {
-				return err	
+				return err
 
 			}
 		}
 	}
 	return nil
 }
-func login(opts *options) error{
+func login(opts *options) error {
 	if len(opts.Username) == 0 || len(opts.Password) == 0 {
 		return errors.New("username and password are required")
 	}
@@ -145,8 +145,10 @@ func login(opts *options) error{
 		return errors.New("registry is required")
 	}
 
-	cmd := exec.Command(buildahPath,"login", "--username", opts.Username, "--password-stdin",opts.Registry)
+	cmd := exec.Command(buildahPath, "login", "--username", opts.Username, "--password-stdin", opts.Registry)
 	cmd.Stdin = bytes.NewBufferString(opts.Password)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("login failed: %s", err.Error())
@@ -154,58 +156,65 @@ func login(opts *options) error{
 	log.Println("INFO: login success at registry", opts.Registry)
 	return nil
 }
-func createManifest(opts *options) error{
+func createManifest(opts *options) error {
 	if len(opts.ManifestName) == 0 {
 		opts.ManifestName = os.Getenv("CI_COMMIT_SHA")
 	}
-	
-	args := []string{"manifest", "create", opts.ManifestName,"--log-level",opts.LogLevel}
+
+	args := []string{"manifest", "create", opts.ManifestName, "--log-level", opts.LogLevel}
 	args = append(args, opts.Flags...)
 	args = append(args, opts.ManifestArgs...)
-	out, err := exec.Command(buildahPath,args...).CombinedOutput()
+	cmd := exec.Command(buildahPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("creating manifest failed: %s\n%s", err.Error(), out)
+		return fmt.Errorf("creating manifest failed: %s", err.Error())
 	}
 	log.Println("INFO: created manifest", opts.ManifestName)
 	return nil
 }
-func buildArchs(opts *options)error{
-	
-	path := opts.CurrentPath +"/"+ opts.Context 
-	tag := opts.Registry+"/"+opts.Repository+":"+opts.Tag
+func buildArchs(opts *options) error {
+
+	path := opts.CurrentPath + "/" + opts.Context
+	tag := opts.Registry + "/" + opts.Repository + ":" + opts.Tag
 	for _, arch := range opts.Architectures {
-		
+
 		log.Println("INFO: building for architecture", arch)
 		start := time.Now()
-		args:= []string{"build", "--manifest", opts.ManifestName, "--arch",arch,"--tag",tag,"--log-level",opts.LogLevel}
+		args := []string{"build", "--manifest", opts.ManifestName, "--arch", arch, "--tag", tag, "--log-level", opts.LogLevel}
 		args = append(args, opts.Flags...)
 		args = append(args, opts.BuildArgs...)
-		if !strings.Contains(runtime.GOARCH,arch){
+		if !strings.Contains(runtime.GOARCH, arch) {
 			log.Println("INFO: QEMU for", arch)
 			args = append(args, "-f")
 		}
 		args = append(args, path)
 		log.Println("INFO: building with args", args)
-		output, err:= exec.Command(buildahPath,args...).CombinedOutput()
+		cmd := exec.Command(buildahPath, args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("building arch %s failed: %s\n%s", arch,err.Error(), output)
+			return fmt.Errorf("building arch %s failed: %s", arch, err.Error())
 		}
-		log.Println("INFO: build successfull for architecture", arch, "in",time.Since(start).Minutes(),"minutes")
+		log.Println("INFO: build successfull for architecture", arch, "in", time.Since(start).Minutes(), "minutes")
 	}
 	log.Println("INFO: build successfull finished for tag", tag)
 	return nil
 }
-func push(opts *options) error{
-	path := opts.Transport+ "://"+ opts.Registry+"/"+opts.Repository+":"+opts.Tag
-	args:= []string{"manifest", "push","--all","--log-level",opts.LogLevel, opts.ManifestName, path}
+func push(opts *options) error {
+	path := opts.Transport + "://" + opts.Registry + "/" + opts.Repository + ":" + opts.Tag
+	args := []string{"manifest", "push", "--all", "--log-level", opts.LogLevel, opts.ManifestName, path}
 	args = append(args, opts.Flags...)
 	args = append(args, opts.PushArgs...)
-	out, err := exec.Command(buildahPath,args...).CombinedOutput()
+	cmd := exec.Command(buildahPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("pushing image failed: %s\n%s", err.Error(), out)
+		return fmt.Errorf("pushing image failed: %s", err.Error())
 	}
 	log.Println("INFO: pushed successfully to", path)
 	return nil
 }
-
-
