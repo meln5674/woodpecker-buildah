@@ -25,6 +25,35 @@ steps:
       password:
         from_secret: docker_password
 ```
+
+FUSE OverlayFS:
+
+```
+steps:
+  build_and_release_and_push:
+    image: maltegrosse/woodpecker-buildah:0.0.11
+    pull: true
+    environment:
+      STORAGE_DRIVER: overlay
+    backend_options:
+      kubernetes:
+        resources:
+          limits:
+            smarter-devices/fuse: 1
+    settings:
+      registry: somehub.com
+      repository: theuser/mytarget_repo
+      tag: 4.0.12c
+      architectures: amd64 aarch64
+      context: Dockerfile
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+```
+
+To enable `smarter-devices/fuse` see https://github.com/smarter-project/smarter-device-manager
+
 ## Limitation
 There are certain considerations between security and performance, especially running on Kubernetes. Currently, the plugin runs with vfs - and it is quite slow... see links for further information.
 
