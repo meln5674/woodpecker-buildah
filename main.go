@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -19,28 +20,29 @@ const (
 )
 
 type options struct {
-	Username      string
-	Password      string
-	Registry      string
-	Repository    string
-	Tag           string
-	Context       string
-	ManifestName  string
-	Architectures []string
-	Transport string
-	Flags []string
-	LoginArgs []string
-	ManifestArgs []string
-	BuildArgs []string
-	PushArgs []string
-	Steps []string
-	LogLevel string
+	Username         string
+	Password         string
+	Registry         string
+	Repository       string
+	Tag              string
+	Context          string
+	ManifestName     string
+	Architectures    []string
+	Transport        string
+	Flags            []string
+	LoginArgs        []string
+	ManifestArgs     []string
+	BuildArgs        []string
+	PushArgs         []string
+	Steps            []string
+	LogLevel         string
+	RegistriesConfig string
 
 	CurrentPath string
 }
 
 func main() {
-	
+
 	log.Println("INFO: starting buildah plugin")
 	opts, err := readEnv()
 	if err != nil {
@@ -53,7 +55,7 @@ func main() {
 	log.Println("INFO: finish buildah plugin")
 
 }
-func readEnv() (*options,error){
+func readEnv() (*options, error) {
 	viper.SetEnvPrefix("plugin")
 	viper.AutomaticEnv()
 	viper.SetTypeByDefaultValue(true)
@@ -75,10 +77,11 @@ func readEnv() (*options,error){
 	viper.BindEnv("manifestargs")
 	viper.BindEnv("buildargs")
 	viper.BindEnv("pushargs")
-	viper.SetDefault("steps", []string{"login","manifest","build","push"})
+	viper.SetDefault("steps", []string{"login", "manifest", "build", "push"})
 	viper.BindEnv("steps")
 	viper.SetDefault("loglevel", "info") // debug, info, warn, error
 	viper.BindEnv("loglevel")
+	viper.BindEnv("registriesconfig")
 	var opts options
 	err := viper.Unmarshal(&opts)
 	if err != nil {
@@ -88,6 +91,22 @@ func readEnv() (*options,error){
 	return &opts, nil
 }
 func execute(opts *options) error {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	containersDir := filepath.Join(userHome, ".config/containers")
+	err = os.MkdirAll(containersDir, 0700)
+	if err != nil {
+		return err
+	}
+	if opts.RegistriesConfig != "" {
+		registriesConfPath := filepath.Join(containersDir, "registries.conf")
+		err = os.WriteFile(registriesConfPath, []byte(opts.RegistriesConfig), 0600)
+		if err != nil {
+			return err
+		}
+	}
 	for _, step := range opts.Steps {
 		switch step {
 		case "login":
