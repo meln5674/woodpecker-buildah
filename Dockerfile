@@ -1,9 +1,10 @@
 FROM golang:1.21 AS builder
 RUN mkdir -p /go/src/wrapper
 WORKDIR /go/src/wrapper
-COPY . ./
+COPY go.mod go.sum ./
 RUN go mod download
 RUN go mod verify
+COPY main.go ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -a -o /wrapper .
 
 FROM docker.io/alpine:latest AS run
